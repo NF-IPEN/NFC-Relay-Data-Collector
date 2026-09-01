@@ -27,179 +27,7 @@ def send_framed(sock, payload: bytes):
     """payload 앞에 4바이트 길이를 붙여서 전송."""
     if len(payload) > MAX_FRAME_SIZE:
         raise ValueError("payload가 너무 큽니다.")
-# -*- coding: utf-8 -*-
-"""
-core/framing.py
-===============
 
-소켓 기반 Relay Channel에서 사용하는 공통 메시지 framing 모듈.
-
-APDU bytes를 TCP/Bluetooth 등의 소켓으로 전송할 때,
-소켓 자체에는 메시지 경계가 없기 때문에 다음과 같은 형식으로
-데이터를 주고받는다.
-
-    [4-byte payload length][payload]
-
-송신:
-    send_framed()
-
-수신:
-    recv_exact()
-    recv_framed()
-
-Relay:
-    relay_transmit_over_socket()
-
-Card-side:
-    serve_loop()
-
-이 framing 규칙은 특정 채널(Wi-Fi/Bluetooth)에 종속되지 않으며,
-channels/wifi.py와 channels/bluetooth.py에서 공통으로 사용한다.
-"""
-
-from __future__ import annotations
-
-import struct
-
-
-# 한 번에 보낼 수 있는 최대 frame 크기
-# 비정상적으로 큰 데이터가 들어오는 것을 방지하기 위한 안전장치
-MAX_FRAME_SIZE = 1024 * 1024
-
-
-def send_framed(sock, payload: bytes):
-    """
-    payload 앞에 4바이트 길이 정보를 붙여 전송한다.
-
-    Frame format:
-        [4-byte payload length][payload]
-
-    길이는 Big-Endian unsigned integer로 저장한다.
-    """
-
-    if len(payload) > MAX_FRAME_SIZE:
-        raise ValueError("payload가 너무 큽니다.")
-
-    sock.sendall(
-        struct.pack(">I", len(payload)) + payload
-    )
-
-
-def recv_exact(sock, n: int) -> bytes:
-    """
-    소켓에서 정확히 n바이트를 받을 때까지 읽는다.
-
-    TCP에서는 한 번의 recv() 호출이 하나의 메시지를
-    의미하지 않기 때문에 반드시 필요한 함수이다.
-    """
-
-    buf = bytearray()
-
-    while len(buf) < n:
-
-        chunk = sock.recv(n - len(buf))
-
-        if not chunk:
-            raise ConnectionError(
-                "소켓 연결이 종료되었습니다."
-            )
-
-        buf.extend(chunk)
-
-    return bytes(buf)
-
-
-def recv_framed(sock) -> bytes:
-    """
-    하나의 frame을 수신한다.
-
-    1. 먼저 4바이트 payload length를 읽는다.
-    2. 해당 길이만큼 payload를 읽는다.
-    """
-
-    raw_length = recv_exact(sock, 4)
-
-    length = struct.unpack(
-        ">I",
-        raw_length
-    )[0]
-
-    if length > MAX_FRAME_SIZE:
-        raise ValueError(
-            f"비정상적인 frame size: {length}"
-        )
-
-    return recv_exact(sock, length)
-
-
-def relay_transmit_over_socket(sock, apdu: bytes) -> bytes:
-    """
-    Relay Channel을 통해 APDU 하나를 전달하고
-    해당 APDU에 대한 응답을 반환한다.
-
-    동작:
-
-        APDU
-          ↓
-        send_framed()
-          ↓
-        socket
-          ↓
-        remote side
-          ↓
-        response
-          ↓
-        recv_framed()
-    """
-
-    send_framed(sock, apdu)
-
-    return recv_framed(sock, )
-
-
-def serve_loop(sock, card_device):
-    """
-    Card-side relay loop.
-
-    소켓에서 APDU를 수신하고,
-    card_device를 통해 실제 NFC 카드에 전달한 뒤,
-    카드의 응답을 다시 소켓으로 전송한다.
-
-    동작:
-
-        socket
-          ↓
-        recv_framed()
-          ↓
-        APDU
-          ↓
-        card_device.transmit()
-          ↓
-        response
-          ↓
-        send_framed()
-          ↓
-        socket
-    """
-
-    print("[card_role] 연결 수립. APDU relay 시작.")
-
-    try:
-
-        while True:
-
-            apdu = recv_framed(sock)
-
-            response = card_device.transmit(apdu)
-
-            send_framed(
-                sock,
-                response
-            )
-
-    except ConnectionError:
-
-        print("[card_role] 연결 종료.")
     sock.sendall(struct.pack(">I", len(payload)) + payload)
 
 
@@ -246,7 +74,14 @@ def serve_loop(sock, card_device):
     try:
         while True:
             apdu = recv_framed(sock)
-            response = card_device.transmit(apdu)
+            # card_device.transmit 은 리스트(int) APDU를 받고
+            # (response_body, sw1, sw2) 튜플을 돌려준다(reader 계약).
+            result = card_device.transmit(list(apdu))
+            if isinstance(result, tuple) and len(result) == 3:
+                body, sw1, sw2 = result
+                response = bytes(body) + bytes([sw1, sw2])
+            else:
+                response = bytes(result)
             send_framed(sock, response)
     except ConnectionError:
         print("[card_role] 연결 종료.")
