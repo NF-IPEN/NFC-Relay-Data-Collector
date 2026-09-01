@@ -1,0 +1,15 @@
+{
+  "session_id": "trial000_fd61fc",
+  "channel": "baseline_usb",
+  "total_ms": 245.77090027742088,
+  "success": true,
+  "stats": {
+    "n": 4,
+    "mean_ms": 61.44272506935522,
+    "std_ms": 34.952930019461164,
+    "jitter_ms": 29.890400743322044,
+    "min_ms": 22.770200157538056,
+    "max_ms": 116.5805000346154
+  },
+  "n_commands": 4
+}
