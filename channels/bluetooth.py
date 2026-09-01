@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from core.framing import serve_loop
 from channels.wifi import run_reader_role
-from reader.mole import make_device
+from reader.reader import make_device
 
 
 CHANNEL_LABEL = "relay_bt"

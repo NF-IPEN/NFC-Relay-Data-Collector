@@ -28,7 +28,7 @@ from core.timing import (
     save_session_csv, save_session_summary_json,
 )
 from apdu.transaction import run_emv_transaction
-from reader.mole import make_device
+from reader.reader import make_device
 
 
 CHANNEL_LABEL = "relay_tcp_wifi"
