@@ -24,8 +24,11 @@ import uuid
 
 from core.framing import serve_loop, relay_transmit_over_socket
 from core.timing import (
-    SessionResult, ApduTimer,
-    save_session_csv, save_session_summary_json,
+    ApduTimer,
+    SessionResult,
+    save_session_csv,
+    save_session_summary_json,
+    save_sessions_csv,
 )
 from apdu.transaction import run_emv_transaction
 from reader.reader import make_device
@@ -69,9 +72,6 @@ def run_reader_role(connect_fn, channel_label: str, trials: int):
         if not session.timings:
             continue
 
-        csv_path = save_session_csv(session)
-        save_session_summary_json(session)
-
         stats = session.per_command_stats
         print(
             f"[{channel_label}] trial={trial:03d} "
@@ -79,9 +79,18 @@ def run_reader_role(connect_fn, channel_label: str, trials: int):
             f"mean={stats.get('mean_ms', 0):.2f}ms "
             f"std={stats.get('std_ms', 0):.2f}ms "
             f"jitter={stats.get('jitter_ms', 0):.2f}ms "
-            f"success={session.success} -> {csv_path.name}"
+            f"success={session.success}"
         )
+
         sessions.append(session)
+
+    # 모든 trial 측정이 끝난 후 CSV 하나로 저장
+    if sessions:
+        csv_path = save_sessions_csv(sessions)
+        print(
+            f"\n[{channel_label}] 전체 {len(sessions)}회 측정 결과 저장 -> "
+            f"{csv_path}"
+        )
 
     return sessions
 

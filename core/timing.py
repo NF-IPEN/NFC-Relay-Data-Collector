@@ -172,17 +172,47 @@ CSV_FIELDS = [
 ]
 
 
-def save_session_csv(session: SessionResult, out_dir: str = "data") -> Path:
+def save_sessions_csv(
+    sessions: List[SessionResult],
+    out_dir: str = "data",
+    filename: str | None = None,
+) -> Path:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    fname = out_path / f"{session.channel}_{session.session_id}.csv"
+    if not sessions:
+        raise ValueError("저장할 session이 없습니다.")
+
+    channel = sessions[0].channel
+
+    if filename is None:
+        filename = f"{channel}_{len(sessions)}trials.csv"
+
+    fname = out_path / filename
+
+    fields = [
+        "trial",
+        "seq",
+        "apdu_name",
+        "apdu_hex",
+        "rtt_ms",
+        "resp_hex",
+        "sw1sw2",
+        "success",
+        "channel",
+        "session_id",
+        "t_sent_epoch",
+    ]
 
     with open(fname, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
-        for timing in session.timings:
-            writer.writerow(asdict(timing))
+
+        for trial, session in enumerate(sessions):
+            for timing in session.timings:
+                row = asdict(timing)
+                row["trial"] = trial
+                writer.writerow(row)
 
     return fname
 
