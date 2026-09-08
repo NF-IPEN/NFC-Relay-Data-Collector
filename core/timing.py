@@ -216,6 +216,21 @@ def save_sessions_csv(
 
     return fname
 
+def save_session_csv(session: SessionResult, out_dir: str = "data") -> Path:
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    fname = out_path / f"{session.channel}_{session.session_id}.csv"
+
+    with open(fname, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+
+        for timing in session.timings:
+            writer.writerow(asdict(timing))
+
+    return fname
+
 
 def save_session_summary_json(session: SessionResult, out_dir: str = "data") -> Path:
     out_path = Path(out_dir)
