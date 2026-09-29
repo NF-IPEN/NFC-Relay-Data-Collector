@@ -47,17 +47,10 @@ def _require_bt():
 def run_card(use_mock: bool, reader_substr: str, trials: int):
     bluetooth = _require_bt()
 
-    srv = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    srv = bluetooth.BluetoothSocket(bluetooth.Protocols.RFCOMM)
     srv.bind(("", RFCOMM_PORT))
     srv.listen(5)
 
-    bluetooth.advertise_service(
-        srv,
-        "NFCRelayTimingCardRole",
-        service_id=BT_UUID_STR,
-        service_classes=[BT_UUID_STR, bluetooth.SERIAL_PORT_CLASS],
-        profiles=[bluetooth.SERIAL_PORT_PROFILE],
-    )
     print(f"[card_role/BT] RFCOMM channel={RFCOMM_PORT} 대기 중")
 
     try:
@@ -84,7 +77,7 @@ def run_reader(target_mac: str, trials: int):
     bluetooth = _require_bt()
 
     def connect_fn():
-        sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        sock = bluetooth.BluetoothSocket(bluetooth.Protocols.RFCOMM)
         sock.connect((target_mac, RFCOMM_PORT))
         return sock
 
