@@ -41,7 +41,9 @@ def run_emv_transaction(
 
     # ---- STEP 1: SELECT PPSE ----
     name, apdu_hex = SELECT_PPSE
+    # send_fn으로 카드에 명령을 보내고, 응답과 왕복 시간(RTT)을 측정한다.
     rec = timer.measure_call(name, hex_to_bytes(apdu_hex), send_fn)
+    # 각 명령의 측정 결과를 실행 순서대로 저장한다.
     timings.append(rec)
 
     if not rec.success:

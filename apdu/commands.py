@@ -29,6 +29,7 @@ from core.tlv import (
 # APDU 조립  (원본 섹션 4)
 # =====================================================================
 
+#1. 결제 애플리케이션 탐색
 SELECT_PPSE = (
     "SELECT_PPSE",
     "00A404000E" "325041592E5359532E4444463031" "00",
@@ -41,12 +42,13 @@ def build_select_aid(aid: bytes) -> Tuple[str, str]:
     if len(aid) > 255:
         raise ValueError("AID 길이가 너무 깁니다.")
 
+    #2. 전달받은 AID로 애플리케이션 선택 명령 구성
     apdu = bytes.fromhex("00A40400") + bytes([len(aid)]) + aid + bytes.fromhex("00")
     return ("SELECT_AID", bytes_to_hex(apdu))
 
 
+#3. PDOL 데이터를 포함한 GPO 명령 생성
 def build_gpo(pdol_data: bytes = b"") -> Tuple[str, str]:
-    """PDOL 없으면 83 00, 있으면 83 <len> <data>."""
     command_data = bytes([0x83, len(pdol_data)]) + pdol_data
     apdu = (
         bytes.fromhex("80A80000")
@@ -56,7 +58,7 @@ def build_gpo(pdol_data: bytes = b"") -> Tuple[str, str]:
     )
     return ("GPO", bytes_to_hex(apdu))
 
-
+#4. SFI와 레코드 번호로 읽기 명령 생성
 def build_read_record(sfi: int, record: int) -> Tuple[str, str]:
     if not 1 <= sfi <= 30:
         raise ValueError(f"잘못된 SFI: {sfi}")

@@ -1,31 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-reader/reader.py
-================
-PC/SC 기반 NFC 카드 리더(실물)와, 하드웨어 없이 검증하는 MockDevice.
-
-담당: 아란 (NFC Reader)
-
-계약(팀 표준 인터페이스):
-    transmit(apdu) -> (response, sw1, sw2)
-  baseline/채널 코드가 dev.transmit 을 send_fn 으로 그대로 넘겨 쓰므로,
-  pyscard의 connection.transmit(apdu) -> (response, sw1, sw2) 계약을 그대로 따른다.
-
-[동하님 코드에서 흡수한 것]
-  run_experiment.py 의 wait_for_card_ready(카드 인식 재시도) 로직을
-  NFCReader.connect_with_retry() 로 통합했다. 실물 측정 중 카드가 잠깐
-  떨어져 0x80100069 가 나도 잠시 기다렸다 재시도한다.
-"""
-
 from __future__ import annotations
 
 import random
 import time
 from typing import Optional, Sequence, Tuple
-
-# 주의: pyscard(smartcard)는 실물 리더를 쓸 때만 필요하다.
-# mock 전용 개발자가 pyscard 없이도 돌릴 수 있도록, import 를 실제
-# 리더 사용 시점(_find_reader 등)까지 지연시킨다.
 
 
 class ReaderError(Exception):
@@ -41,33 +18,18 @@ class CardNotPresentError(ReaderError):
 
 
 class NFCReader:
-    """
-    PC/SC 기반 NFC 카드 리더 (실물). 기본적으로 ACR122 계열을 자동 선택한다.
-
-    사용 예:
-        with NFCReader() as reader:
-            reader.connect_with_retry()          # 카드 올릴 때까지 대기
-            resp, sw1, sw2 = reader.transmit([0x00, 0xA4, 0x04, 0x00, 0x00])
-    """
-
     def __init__(self, reader_name: Optional[str] = None):
         self.reader_name = reader_name
         self._reader = None
         self._connection = None
         self._atr: Optional[bytes] = None
 
-    # ------------------------------------------------------------------
-    # 컨텍스트 매니저
-    # ------------------------------------------------------------------
     def __enter__(self) -> "NFCReader":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.disconnect()
 
-    # ------------------------------------------------------------------
-    # 리더 탐색
-    # ------------------------------------------------------------------
     def _find_reader(self):
         from smartcard.System import readers
         available = readers()
@@ -91,9 +53,6 @@ class NFCReader:
                 return reader
         return available[0]
 
-    # ------------------------------------------------------------------
-    # 연결
-    # ------------------------------------------------------------------
     def connect(self) -> bytes:
         """리더와 카드에 연결한다. 반환: ATR."""
         if self._connection is not None:
@@ -115,13 +74,6 @@ class NFCReader:
             raise ReaderError(f"카드 연결 실패: {exc}") from exc
 
     def connect_with_retry(self, timeout: float = 15.0, interval: float = 0.3) -> bytes:
-        """
-        카드가 리더 위에 인식될 때까지 재시도하며 연결한다.
-        (동하님 run_experiment.py 의 wait_for_card_ready 를 통합한 것)
-
-        실물 측정 중 카드가 잠깐 떨어져도 timeout 안에서 다시 시도한다.
-        반환: ATR / 실패 시 CardNotPresentError.
-        """
         print("카드를 리더 위에 올려주세요...")
         start = time.time()
         last_err = None
@@ -150,9 +102,6 @@ class NFCReader:
             self.connect()
         return self._connection
 
-    # ------------------------------------------------------------------
-    # APDU 전송 (팀 표준 계약)
-    # ------------------------------------------------------------------
     def transmit(
         self,
         apdu: Sequence[int],
@@ -195,14 +144,6 @@ class NFCReader:
 
 
 class MockDevice:
-    """
-    실물 리더 없이 파이프라인을 검증하기 위한 mock.
-    NFCReader와 동일한 계약(transmit(apdu) -> (response, sw1, sw2))을 따른다.
-
-    실제 EMV 흐름(PPSE->AID->GPO->READ)을 흉내내도록 respond_map 기본값을 채워둔다.
-    latency_range_ms 로 실측 RTT 비슷한 인위적 지연을 준다.
-    """
-
     def __init__(
         self,
         latency_range_ms: Tuple[float, float] = (2.5, 4.0),

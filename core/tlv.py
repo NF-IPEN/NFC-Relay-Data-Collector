@@ -1,35 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-core/tlv.py
-===========
-
-EMV 응답 데이터에 사용되는 BER-TLV 파싱 및 기본 바이트 변환
-유틸리티를 제공한다.
-
-이 모듈은 다음 기능만 담당한다.
-
-    hex_to_bytes()
-        Hex 문자열 → bytes
-
-    bytes_to_hex()
-        bytes → 대문자 Hex 문자열
-
-    bcd_encode()
-        숫자 문자열 → BCD bytes
-
-    parse_tlv()
-        BER-TLV의 1단계 구조 파싱
-
-    find_all_tag()
-        중첩된 constructed TLV를 포함하여 특정 tag 검색
-
-    find_first_tag()
-        특정 tag의 첫 번째 value 검색
-
-이 모듈은 reader, channel, APDU transaction,
-timing, detection 로직에 의존하지 않는다.
-"""
-
 from __future__ import annotations
 from typing import List, Optional, Tuple
 
