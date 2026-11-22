@@ -66,6 +66,9 @@ def build_arg_parser():
     p_an = sub.add_parser("analyze", help="결과 집계")
     p_an.add_argument("--results-dir", default="data")
     p_an.add_argument("--out-dir", default="data/summary")
+    p_an.add_argument("--baseline-channel", default="baseline_usb")
+    p_an.add_argument("--k", type=float, default=3.0)
+    p_an.add_argument("--recursive", action="store_true")
 
     return parser
 
@@ -120,7 +123,13 @@ def main():
             )
 
     elif args.command == "analyze":
-        run_analyze(results_dir=args.results_dir, out_dir=args.out_dir)
+        run_analyze(
+            results_dir=args.results_dir,
+            out_dir=args.out_dir,
+            baseline_channel=args.baseline_channel,
+            k=args.k,
+            recursive=args.recursive,
+        )
 
 
 if __name__ == "__main__":

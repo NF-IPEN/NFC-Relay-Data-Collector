@@ -1,34 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-analysis/plot.py
-================
-data/ 에 쌓인 세션 CSV들을 읽어 채널별로 집계하고,
-문헌값과 비교표/그래프를 만든다.
-
-[원본 위치] ppse_measure_channal.py 의
-  - 섹션 20 (Result loading): load_all_sessions
-  - 섹션 21 (Statistics): summarize
-  - 섹션 22 (Output): write_csv, write_markdown, plot_bar
-  - 섹션 22 뒤 (run_analyze)
-
-★ 4번 담당(Data & Analysis)이 주로 손볼 파일 ★
-이 파일은 측정 코드에 의존하지 않는다. CSV 칸 이름(core/timing.CSV_FIELDS)만
-알면 되므로, 가짜 CSV를 data/ 에 넣어두면 지금 바로 개발/테스트할 수 있다.
-
---------------------------------------------------------------------------
-[병합 내역]
-문헌값 비교(summarize/write_csv/write_markdown/plot_bar)는 원본 그대로 두고,
-아래 두 가지를 추가함:
-  1) build_session_totals / compute_threshold
-     - baseline 채널(기본 usb) 세션 총 RTT의 평균+k*표준편차를 임계값으로 잡고,
-       각 채널이 relay 의심 구간인지(above_threshold) 판정
-  2) plot_histogram / plot_boxplot
-     - 채널별 "세션 총 RTT" 분포를 히스토그램/박스플롯으로 시각화
-     - 히스토그램에는 위 threshold를 점선으로 표시해 채널 간 분리 정도를 눈으로 확인
-run_analyze()에서 문헌값 비교와 threshold 기반 탐지를 모두 실행하도록 합침.
---------------------------------------------------------------------------
-"""
-
 from __future__ import annotations
 import argparse
 import csv
@@ -43,10 +12,11 @@ from core.literature import LITERATURE, compare_to_literature
 # CSV 로딩  (원본 섹션 20)
 # ---------------------------------------------------------------------
 
-def load_all_sessions(results_dir: Path):
+def load_all_sessions(results_dir: Path, recursive: bool = False):
     by_channel = defaultdict(lambda: defaultdict(list))
+    paths = results_dir.rglob("*.csv") if recursive else results_dir.glob("*.csv")
 
-    for csv_path in sorted(results_dir.glob("*.csv")):
+    for csv_path in sorted(paths):
         if csv_path.name in {"channel_comparison.csv"}:
             continue
 
@@ -134,7 +104,6 @@ def summarize(by_channel):
 # ---------------------------------------------------------------------
 
 def build_session_totals(by_channel):
-    """채널별 '세션 1회 = 총 RTT(ms)' 리스트. 히스토그램/박스플롯/threshold 계산에 사용."""
     totals_by_channel = {}
     for channel, sessions in by_channel.items():
         totals = [sum(rtts) for rtts in sessions.values() if rtts]
@@ -143,12 +112,7 @@ def build_session_totals(by_channel):
     return totals_by_channel
 
 
-def compute_threshold(rows: list, baseline_channel: str = "usb", k: float = 3.0):
-    """
-    summarize()가 만든 rows에 채널별 relay 탐지 threshold/판정을 덧붙인다.
-    threshold = baseline 채널의 mean_total_ms + k * std_total_ms
-    (문헌값과는 별개로, 이번 실측 baseline 대비 이상치를 잡는 실전 임계값)
-    """
+def compute_threshold(rows: list, baseline_channel: str = "baseline_usb", k: float = 3.0):
     baseline_row = next((r for r in rows if r["channel"] == baseline_channel), None)
     if baseline_row is None:
         print(f"[경고] baseline 채널 '{baseline_channel}'이 데이터에 없어 threshold를 계산할 수 없습니다.")
@@ -356,13 +320,14 @@ def plot_boxplot(totals_by_channel: dict, out_path: Path):
 def run_analyze(
     results_dir: str = "data",
     out_dir: str = "data/summary",
-    baseline_channel: str = "usb",
+    baseline_channel: str = "baseline_usb",
     k: float = 3.0,
+    recursive: bool = False,
 ):
     results_dir_p = Path(results_dir)
     out_dir_p = Path(out_dir)
 
-    by_channel = load_all_sessions(results_dir_p)
+    by_channel = load_all_sessions(results_dir_p, recursive=recursive)
     rows = summarize(by_channel)
     rows = compute_threshold(rows, baseline_channel=baseline_channel, k=k)
 
@@ -388,8 +353,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="채널별 RTT 세션 분석 (문헌값 비교 + threshold 탐지)")
     parser.add_argument("--data-dir", default="data", help="세션 CSV들이 있는 폴더")
     parser.add_argument("--out-dir", default="data/summary", help="결과 저장 폴더")
-    parser.add_argument("--baseline-channel", default="usb", help="threshold 계산 기준 채널")
+    parser.add_argument("--baseline-channel", default="baseline_usb", help="threshold 계산 기준 채널")
     parser.add_argument("--k", type=float, default=3.0, help="threshold = baseline_mean + k*std")
+    parser.add_argument("--recursive", action="store_true", help="하위 폴더의 CSV도 읽기")
     args = parser.parse_args()
 
     run_analyze(
@@ -397,4 +363,5 @@ if __name__ == "__main__":
         out_dir=args.out_dir,
         baseline_channel=args.baseline_channel,
         k=args.k,
+        recursive=args.recursive,
     )
